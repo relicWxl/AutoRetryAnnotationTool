@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>任务表格</title>
+    <style>
+        /* 页面背景使用渐变色 */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            color: #333;
+            background: linear-gradient(to right, #e6f0ff, #f4f4f4);
+            margin: 0;
+            padding: 20px;
+            overflow: hidden; /* 防止整个页面出现滚动条 */
+        }
+
+        /* 页面背景和搜索框区域使用相同的渐变色 */
+        body, .filter-container {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(to right, #e6f0ff, #f4f4f4);
+            color: #333;
+        }
+
+        body::after {
+            opacity: 0.3; /* 根据需要调整透明度 */
+            pointer-events: none; /* 允许鼠标事件穿透 */
+            content: 'Retry';
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            font-size: 10em;
+            color: transparent;
+            z-index: 1;
+            transform: translate(-50%, -50%) rotate(-20deg);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            text-align: center;
+            -webkit-text-stroke: 1px rgba(0, 0, 0, 0.1); /* 淡色文字边框 */
+            text-shadow:
+                    0 0 8px #b0c7ff,  /* 非常淡的蓝色光晕 */
+                    0 0 16px #b0c7ff,  /* 加强一点的淡蓝色光晕 */
+                    0 0 24px #b0c7ff;  /* 最大的淡蓝色光晕 */
+            animation: pulse 2s infinite;
+        }
+
+        /* 表格样式 */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        /* 表格容器样式 */
+        .table-container {
+            overflow-x: auto; /* 允许在需要时水平滚动 */
+            max-height: calc(100vh - 200px);
+            overflow-y: auto;
+            margin-top: 20px; /* 表格和搜索框间距 */
+            scrollbar-width: none; /* 针对 Firefox */
+            margin-bottom: 80px; /* 确保有足够空间给分页控件和滚动提示 */
+        }
+
+        .table-container::-webkit-scrollbar {
+            display: none; /* 针对 Webkit 浏览器 */
+        }
+
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+        }
+        tr, td {
+            /* 你的表格行和单元格的其他样式 */
+            position: relative; /* 如果尚未设置，需添加这个 */
+            z-index: 0; /* 或者不设置 z-index */
+        }
+        td > * { /* 假设你的文字被包含在某个元素中，如 <span> */
+            position: relative;
+            z-index: 2; /* 确保这个值高于body::after的z-index */
+        }
+        thead {
+            background: linear-gradient(to right, #e6f0ff, #f4f4f4);
+            position: sticky;
+            top: 0; /* 固定表头 */
+            z-index: 10;
+        }
+        tbody tr:hover {
+            background: linear-gradient(to right, #e0e6f8, #f4f4f4); /* 只有表格体的行变色 */
+        }
+        /* 解决点击表头出现高亮的问题 */
+        tbody tr:active {
+            background-color: #d0d8f0; /* 点击表格体的行时的颜色 */
+        }
+        /* 调整鼠标悬浮到行上的颜色 */
+        tr:hover {
+            background: linear-gradient(to right, #e0e6f8, #f4f4f4);;
+        }
+
+        /* 模态弹窗样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000; /* 确保模态框在其他元素之上 */
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.65);
+        }
+
+        .modal-content {
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 70%;
+            background: linear-gradient(to right, #e6f0ff, #f4f4f4);
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        /* 输入框和按钮样式 */
+        input, select, button {
+            padding: 8px;
+            margin: 8px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        /* 搜索框样式调整 */
+        .filter-container {
+            display: flex;
+            align-items: center;
+            justify-content: start;
+            gap: 10px;
+            background-color: #fff;
+            border-radius: 5px;
+            padding: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        /* 高亮样式 */
+        .highlight {
+            background-color: transparent;
+            color: red;
+            font-weight: bold;
+        }
+
+        @keyframes pulse {
+            0% {
+                text-shadow:
+                        0 0 8px #b0c7ff,
+                        0 0 16px #b0c7ff,
+                        0 0 24px #b0c7ff;
+            }
+            50% {
+                text-shadow:
+                        0 0 12px #d0e0ff,
+                        0 0 20px #d0e0ff,
+                        0 0 28px #d0e0ff;
+            }
+            100% {
+                text-shadow:
+                        0 0 8px #b0c7ff,
+                        0 0 16px #b0c7ff,
+                        0 0 24px #b0c7ff;
+            }
+        }
+
+        /* 响应式布局 */
+        @media screen and (max-width: 600px) {
+            body::after {
+                font-size: 5em;
+            }
+            .modal-content {
+                max-height: calc(100vh - 150px); /* 在小屏幕上调整高度 */
+            }
+        }
+
+        /* 分页控件样式 */
+        .pagination {
+            position: fixed;
+            right: 20px;
+            bottom: 30px;
+        }
+
+        /* 页面底部描述文字样式 */
+        .footer {
+            text-align: center;
+            position: fixed;
+            bottom: 10px;
+            width: 100%;
+            font-size: 0.8em;
+            color: #666;
+        }
+
+        /* 滚动提示样式调整 */
+        .scroll-hint {
+            text-align: right;
+            position: fixed;
+            right: 25px; /* 与分页控件对齐 */
+            bottom: 90px; /* 位于分页控件上方 */
+            color: #666;
+            font-size: 0.8em;
+            visibility: hidden;
+        }
+        /* 高亮表格行的样式 */
+        .highlight-row {
+            background: linear-gradient(to right, #d8e3ff, #f4f4f4);
+        }
+        .disabled-button {
+            background-color: #ccc; /* 灰色背景 */
+            color: #666; /* 深灰色文字 */
+            border: 1px solid #aaa; /* 边框颜色 */
+            cursor: not-allowed; /* 光标样式 */
+        }
+        /* 错误消息容器样式 */
+        .error-message-container {
+            display: none;
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #ff7575;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+        }
+
+        /* JSON 内容预置元素样式 */
+        #errorJsonContent {
+            white-space: pre-wrap; /* 保留空白字符并自动换行 */
+            overflow: auto;
+        }
+
+    </style>
+</head>
+<body>
+
+<!-- 筛选部分 -->
+<div class="filter-container">
+    <label for="type">任务类型:</label>
+    <input type="text" id="type" placeholder="任务类型">
+
+    <label for="retriesNumber">已重试次数:</label>
+    <input type="number" id="retriesNumber" placeholder="次数">
+
+    <label for="param">参数:</label>
+    <input type="text" id="param" placeholder="纯内存检索，速度特别慢" style="min-width: 180px">
+
+    <button onclick="applyFiltersForButton()">筛选</button>
+</div>
+
+<div class="table-container" id="tableContainer">
+    <table>
+        <thead>
+        <tr>
+            <th>选择</th>
+            <th>序号</th>
+            <th>编号</th>
+            <th style="min-width: 80px">已重试次数</th>
+            <th style="min-width: 100px">最后更新时间</th>
+            <th>任务类型</th>
+            <th>参数</th>
+        </tr>
+        </thead>
+        <tbody>
+        <!-- 表格数据将在这里填充 -->
+        </tbody>
+    </table>
+</div>
+
+<!-- 滚动提示 -->
+<div class="scroll-hint" id="scrollHint">
+    向下滑动查看更多数据
+</div>
+
+<!-- 分页控件 -->
+<div class="pagination">
+    <label for="pageSize">每页显示:</label>
+    <select id="pageSize" onchange="changePageSize()">
+        <option value="10">10</option>
+        <option value="50">50</option>
+        <option value="100">100</option>
+        <option value="200">200</option>
+    </select>
+    <button id="prevPage" onclick="prevPage()">上一页</button>
+    <span id="currentPage">1</span>
+    <button id="nextPage" onclick="nextPage()">下一页</button>
+</div>
+
+<!-- 模态弹窗，增加搜索框 -->
+<div id="myModal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <input type="text" id="searchInModal" placeholder="搜索JSON..." oninput="highlightSearch()">
+        <pre id="jsonContent"></pre>
+    </div>
+</div>
+<!-- 错误消息容器 -->
+<div id="errorMessageContainer" class="error-message-container">
+    <pre id="errorJsonContent"></pre>
+</div>
+
+
+<!-- 页面底部描述文字 -->
+<div class="footer">
+    Power by <a href="https://open.thunisoft.com/fytd/yffy/retry">Retry</a>
+</div>
+
+<script>
+    var highlightedRow = null; // 用于跟踪当前高亮的行
+    var tableData = [];
+    var currentPage = 1;
+    var pageSize = 10;
+    var hasNextPage = true;
+
+    function changePageSize() {
+        pageSize = document.getElementById('pageSize').value;
+        currentPage = 1;
+        document.getElementById('currentPage').innerText = currentPage;
+        applyFilters();
+    }
+
+    function prevPage() {
+        if (currentPage > 1) {
+            currentPage--;
+            applyFilters();
+        }
+    }
+
+    function nextPage() {
+        if (hasNextPage) {
+            currentPage++;
+            applyFilters();
+        }
+    }
+
+    // 模态框相关逻辑
+    var modal = document.getElementById("myModal");
+    var span = document.getElementsByClassName("close")[0];
+
+    span.onclick = function () {
+        modal.style.display = "none";
+        // 恢复表头的 z-index
+        document.querySelector('thead').style.zIndex = '10';
+        if (highlightedRow) {
+            highlightedRow.classList.remove('highlight-row');
+            highlightedRow = null;
+        }
+    }
+
+    window.onclick = function (event) {
+        if (event.target === modal) {
+            modal.style.display = "none";
+            if (highlightedRow) {
+                highlightedRow.classList.remove('highlight-row');
+                highlightedRow = null;
+            }
+            // 恢复表头的 z-index
+            document.querySelector('thead').style.zIndex = '10';
+        }
+    }
+
+    function populateTable(response) {
+        tableData = response.dataList;
+        currentPage = response.query.pageNum;
+        pageSize = response.query.pageSize;
+        hasNextPage = response.hasNextPage;
+        let prevPageButton = document.getElementById("prevPage");
+        if (currentPage === 1) {
+            prevPageButton.disabled = true;
+            prevPageButton.classList.add("disabled-button");
+        } else {
+            prevPageButton.disabled = false;
+            prevPageButton.classList.remove("disabled-button");
+        }
+        let nextPageButton = document.getElementById("nextPage");
+        if (hasNextPage) {
+            nextPageButton.disabled = false;
+            nextPageButton.classList.remove("disabled-button");
+        } else {
+            nextPageButton.disabled = true;
+            nextPageButton.classList.add("disabled-button");
+        }
+        var tbody = document.querySelector('table tbody');
+        tbody.innerHTML = '';
+        tableData.forEach(function (row, index) {
+            var tr = document.createElement('tr');
+
+            // 计算序号（考虑分页）
+            var serialNumber = ((currentPage - 1) * pageSize) + index + 1;
+
+            // 添加复选框
+            var checkboxTd = document.createElement('td');
+            var checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkboxTd.appendChild(checkbox);
+            tr.appendChild(checkboxTd);
+
+            // 添加序号
+            var serialTd = document.createElement('td');
+            serialTd.textContent = serialNumber;
+            tr.appendChild(serialTd);
+
+            var bhTd = document.createElement('td');
+            bhTd.textContent = row.bh;
+            tr.appendChild(bhTd);
+
+            var retriesNumberTd = document.createElement('td');
+            retriesNumberTd.textContent = row.retriesNumber;
+            tr.appendChild(retriesNumberTd);
+
+            var zhgxsjTd = document.createElement('td');
+            zhgxsjTd.textContent = row.zhgxsj;
+            tr.appendChild(zhgxsjTd);
+
+            // 使用 JSON.stringify 来转换 params 对象
+            var paramsString = JSON.stringify(row.params, null, 2);
+            var typeTd = document.createElement('td');
+            typeTd.classList.add('json-cell');
+            typeTd.textContent = row.type;
+            var paramsTd = document.createElement('td');
+            paramsTd.classList.add('json-cell');
+            paramsTd.textContent = paramsString;
+
+            // 仅为 params 单元格绑定点击事件
+            paramsTd.addEventListener('click', function () {
+                showJSONModal(paramsString, tr);
+            });
+            // 仅为 type 单元格绑定点击事件
+            typeTd.addEventListener('click', function () {
+                showJSONModal(paramsString, tr);
+            });
+
+            // 将单元格添加到行中
+            tr.appendChild(typeTd);
+            tr.appendChild(paramsTd);
+            tbody.appendChild(tr);
+        });
+
+        document.querySelectorAll('.json-cell').forEach(function (td) {
+            td.addEventListener('click', function () {
+                showJSONModal(td.innerText, td);
+            });
+        });
+        checkScroll();
+    }
+
+    function showJSONModal(jsonString, row) {
+        // 如果有其他行已经高亮，则移除其高亮效果
+        if (highlightedRow) {
+            highlightedRow.classList.remove('highlight-row');
+        }
+
+        // 高亮当前点击的行
+        highlightedRow = row;
+        highlightedRow.classList.add('highlight-row');
+
+        var modal = document.getElementById("myModal");
+        var jsonContent = document.getElementById("jsonContent");
+        jsonContent.textContent = JSON.stringify(JSON.parse(jsonString), null, 2);
+        jsonContent.setAttribute('data-original', jsonContent.textContent);
+        modal.style.display = "block";
+        // 降低表头的 z-index
+        document.querySelector('thead').style.zIndex = '0';
+    }
+
+    function highlightSearch() {
+        var searchValue = document.getElementById('searchInModal').value;
+        var jsonContent = document.getElementById('jsonContent');
+        var originalText = jsonContent.getAttribute('data-original');
+
+        if (!searchValue) {
+            jsonContent.innerHTML = originalText;
+            return;
+        }
+
+        var regex = new RegExp('(' + searchValue + ')', 'gi');
+        jsonContent.innerHTML = originalText.replace(regex, '<span class="highlight">$1</span>');
+    }
+
+    function applyFiltersForButton() {
+        currentPage = 1;
+        applyFilters();
+    }
+
+    function applyFilters() {
+        document.getElementById('currentPage').innerText = currentPage;
+        var type = document.getElementById("type").value;
+        var retriesNumber = document.getElementById("retriesNumber").value;
+        var param = document.getElementById("param").value;
+        var params = {
+            'type': type,
+            'retriesNumber': retriesNumber,
+            'param': param,
+            'pageNum': this.currentPage,
+            'pageSize': this.pageSize
+        }
+        requestData(params);
+    }
+
+    // 检查是否需要显示滚动提示
+    function checkScroll() {
+        var container = document.getElementById('tableContainer');
+        var hint = document.getElementById('scrollHint');
+
+        if (container.scrollHeight > container.clientHeight) {
+            hint.style.visibility = 'visible';
+        } else {
+            hint.style.visibility = 'hidden';
+        }
+    }
+
+    function requestData(params) {
+        var request = new XMLHttpRequest();
+        request.onreadystatechange = function () {
+            if (request.readyState === 4) {
+                if (request.status === 200) {
+                    populateTable(request.response)
+                } else {
+                    showErrorMessage(request.response);
+                }
+            } else {
+                // HTTP请求还在继续...
+            }
+        }
+        const href = location.href.replace(/retry|retry\.html/g, '');
+        const url = `${href}api/v1/retry/actions/query`;
+        // 将参数转换为查询字符串
+        let queryString = Object.keys(params).map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`).join("&");
+        // 构建最终URL
+        let finalUrl = queryString !== '' ? url + "?" + queryString : url;
+        request.open('GET', finalUrl);
+        request.setRequestHeader("Accept", "application/json")
+        request.responseType = 'json';
+        request.send();
+    }
+
+    // 显示错误提示框
+    function showErrorMessage(obj) {
+        var errorMessageContainer = document.getElementById("errorMessageContainer");
+        var errorJsonContent = document.getElementById("errorJsonContent");
+
+        errorJsonContent.textContent = JSON.stringify(obj, null, 2);
+        errorMessageContainer.style.display = "block";
+
+        // 隐藏提示框定时器，您可以根据需要调整显示时间
+        setTimeout(function () {
+            errorMessageContainer.style.display = "none";
+        }, 3000); // 3秒后隐藏
+    }
+
+
+    // 初始化页面数据
+    requestData({});
+</script>
+</body>
+</html>
