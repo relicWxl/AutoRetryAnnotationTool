@@ -82,7 +82,7 @@ public @interface RetryJobAnnotation {
 
 }
 ```
-## 组件需要用的脚步
+## 组件需要用执行的脚本
 ```
 DROP TABLE IF EXISTS t_retry;
 CREATE TABLE t_retry
