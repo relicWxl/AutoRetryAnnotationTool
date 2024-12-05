@@ -82,3 +82,33 @@ public @interface RetryJobAnnotation {
 
 }
 ```
+需要用到的重试表
+```
+DROP TABLE IF EXISTS t_retry;
+CREATE TABLE t_retry
+(
+    "c_bh"                             char(32)         NOT NULL,
+    "c_type"                           varchar(900)     NOT NULL,
+    "c_type_hex"                       varchar(600)     NOT NULL,
+    "c_param"                          text,
+    "c_param_hex"                      varchar(600),
+    "n_order"                          int4             NOT NULL,
+    "n_retries_number"                 int4             NOT NULL,
+    "n_max_retries"                    int4             NOT NULL,
+    "n_interval_in_minutes"            int4             NOT NULL,
+    "n_interval_multiple"              double precision NOT NULL,
+    "dt_job_start_time"                time(0)          NOT NULL,
+    "dt_job_end_time"                  time(0)          NOT NULL,
+    "dt_next_run_date_time"            timestamp(0)     NOT NULL,
+    "c_state"                          varchar(100)     NOT NULL,
+    "dt_zhgxsj"                        timestamp(0)     NOT NULL,
+    "dt_cjsj"                          timestamp(0)     NOT NULL,
+    "n_last_run_duration_milli_second" bigint,
+    "dt_lock_time"                     timestamp(0),
+    "lock_milli_second"                interval,
+    "c_lock_owner_id"                  varchar(32),
+    CONSTRAINT "pk_retry_pkey" PRIMARY KEY ("c_bh")
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "ui_type_hex_param_hex_state" on t_retry (c_type_hex, c_param_hex, c_state);
+```
