@@ -82,7 +82,7 @@ public @interface RetryJobAnnotation {
 
 }
 ```
-需要用到的重试表
+## 组件需要用的脚步
 ```
 DROP TABLE IF EXISTS t_retry;
 CREATE TABLE t_retry
